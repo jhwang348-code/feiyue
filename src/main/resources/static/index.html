@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MinIO 文件管理测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <h1>MinIO 文件管理测试</h1>
+    
+    <!-- 健康检查 -->
+    <div class="container">
+        <h3>健康检查</h3>
+        <button onclick="checkHealth()">检查服务状态</button>
+        <div id="healthResult" class="result"></div>
+    </div>
+
+    <!-- 文件上传 -->
+    <div class="container">
+        <h3>文件上传</h3>
+        <div class="form-group">
+            <label for="bucketName">Bucket名称:</label>
+            <input type="text" id="bucketName" value="default-bucket" placeholder="输入bucket名称">
+        </div>
+        <div class="form-group">
+            <label for="objectName">对象名称:</label>
+            <input type="text" id="objectName" placeholder="输入对象名称（如：test.jpg）">
+        </div>
+        <div class="form-group">
+            <label for="fileInput">选择文件:</label>
+            <input type="file" id="fileInput">
+        </div>
+        <button onclick="uploadFile()">上传文件</button>
+        <div id="uploadResult" class="result"></div>
+    </div>
+
+    <!-- 获取文件信息 -->
+    <div class="container">
+        <h3>获取文件信息</h3>
+        <div class="form-group">
+            <label for="infoBucketName">Bucket名称:</label>
+            <input type="text" id="infoBucketName" value="default-bucket" placeholder="输入bucket名称">
+        </div>
+        <div class="form-group">
+            <label for="infoObjectName">对象名称:</label>
+            <input type="text" id="infoObjectName" placeholder="输入对象名称">
+        </div>
+        <button onclick="getFileInfo()">获取文件信息</button>
+        <div id="infoResult" class="result"></div>
+    </div>
+
+    <!-- 文件下载 -->
+    <div class="container">
+        <h3>文件下载</h3>
+        <div class="form-group">
+            <label for="downloadBucketName">Bucket名称:</label>
+            <input type="text" id="downloadBucketName" value="test1" placeholder="输入bucket名称">
+        </div>
+        <div class="form-group">
+            <label for="downloadObjectName">对象名称:</label>
+            <input type="text" id="downloadObjectName" value="tujpg2.png" placeholder="输入对象名称">
+        </div>
+        <div class="form-group">
+            <label for="localFilePath">本地保存路径:</label>
+            <input type="text" id="localFilePath" value="C:/temp/minio_download" placeholder="输入本地保存路径（可以是目录）">
+        </div>
+        <button onclick="downloadFile()">下载到本地</button>
+        <button onclick="downloadFileStream()">浏览器下载</button>
+        <div id="downloadResult" class="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/minio';
+
+        function showResult(elementId, data, isSuccess = true) {
+            const element = document.getElementById(elementId);
+            element.textContent = JSON.stringify(data, null, 2);
+            element.className = 'result ' + (isSuccess ? 'success' : 'error');
+        }
+
+        async function checkHealth() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                showResult('healthResult', data, response.ok);
+            } catch (error) {
+                showResult('healthResult', { error: error.message }, false);
+            }
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const bucketName = document.getElementById('bucketName').value;
+            const objectName = document.getElementById('objectName').value;
+
+            if (!fileInput.files[0]) {
+                showResult('uploadResult', { error: '请选择文件' }, false);
+                return;
+            }
+
+            if (!objectName) {
+                showResult('uploadResult', { error: '请输入对象名称' }, false);
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('bucketName', bucketName);
+            formData.append('objectName', objectName);
+
+            try {
+                const response = await fetch(`${API_BASE}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                showResult('uploadResult', data, response.ok);
+            } catch (error) {
+                showResult('uploadResult', { error: error.message }, false);
+            }
+        }
+
+        async function getFileInfo() {
+            const bucketName = document.getElementById('infoBucketName').value;
+            const objectName = document.getElementById('infoObjectName').value;
+
+            if (!objectName) {
+                showResult('infoResult', { error: '请输入对象名称' }, false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/fileInfo?bucketName=${bucketName}&objectName=${objectName}`);
+                const data = await response.json();
+                showResult('infoResult', data, response.ok);
+            } catch (error) {
+                showResult('infoResult', { error: error.message }, false);
+            }
+        }
+
+        async function downloadFile() {
+            const bucketName = document.getElementById('downloadBucketName').value;
+            const objectName = document.getElementById('downloadObjectName').value;
+            const localFilePath = document.getElementById('localFilePath').value;
+
+            if (!objectName) {
+                showResult('downloadResult', { error: '请输入对象名称' }, false);
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE}/download?bucketName=${bucketName}&objectName=${objectName}&localFilePath=${localFilePath}`);
+                const data = await response.json();
+                showResult('downloadResult', data, response.ok);
+            } catch (error) {
+                showResult('downloadResult', { error: error.message }, false);
+            }
+        }
+
+        async function downloadFileStream() {
+            const bucketName = document.getElementById('downloadBucketName').value;
+            const objectName = document.getElementById('downloadObjectName').value;
+
+            if (!objectName) {
+                showResult('downloadResult', { error: '请输入对象名称' }, false);
+                return;
+            }
+
+            try {
+                // 创建一个隐藏的链接来触发下载
+                const link = document.createElement('a');
+                link.href = `${API_BASE}/download/stream?bucketName=${bucketName}&objectName=${objectName}`;
+                link.download = objectName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showResult('downloadResult', { 
+                    success: true, 
+                    message: '浏览器下载已启动',
+                    data: { bucketName, objectName }
+                }, true);
+            } catch (error) {
+                showResult('downloadResult', { error: error.message }, false);
+            }
+        }
+    </script>
+</body>
+</html> 
