@@ -23,7 +23,7 @@ public class Program {
     public static void test1() throws NoSuchAlgorithmException, IOException,
             InvalidKeyException, XmlPullParserException {
         try {
-            // 初始化客户端
+            // 初始化客户端，xx修改测试
             MinioClient minioClient = MinioClient.builder()
                     .endpoint("http://127.0.0.1:9000")
                     .credentials("minioadmin", "minioadmin")
